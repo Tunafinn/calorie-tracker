@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Track calories burned, food, workouts, and weight on this device. Data stays in your browser.">
+  <meta name="theme-color" content="#eef3ea">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Calories">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Calorie &amp; Weight Tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    try {
+      var theme = localStorage.getItem("calorie-tracker-theme");
+      var dark = theme ? theme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (theme === "light" || theme === "dark") document.documentElement.setAttribute("data-theme", theme);
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta && dark) meta.setAttribute("content", "#0c1410");
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to tracker</a>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <img class="mark" src="icons/icon.svg" alt="" width="42" height="42">
+        <div>
+          <h1>Calorie Tracker</h1>
+          <p class="tag">From 1:00 AM CT, Oct 24, 2026</p>
+        </div>
+      </div>
+      <button type="button" id="theme-toggle" aria-pressed="false">Dark</button>
+    </header>
+
+    <main id="content">
+      <p id="notice" class="notice" role="status" hidden></p>
+
+      <section class="hero" aria-labelledby="net-label">
+        <p id="net-label" class="eyebrow">Net calories</p>
+        <p class="hero-value" id="net-value">0.00</p>
+        <p class="hero-unit">kcal · burned minus eaten</p>
+        <p class="rate">3,400 kcal/day · 141.7 per hour</p>
+        <p class="live"><span class="pulse" aria-hidden="true"></span> <span id="as-of">Live · updates every second</span></p>
+      </section>
+
+      <section class="stats" aria-label="Totals">
+        <article class="stat burned">
+          <h2>Total burned</h2>
+          <p id="burned-value">0.00</p>
+          <p class="hint" id="burn-split">Base 0.0 + workouts 0.0</p>
+        </article>
+        <article class="stat eaten">
+          <h2>Total eaten</h2>
+          <p id="eaten-value">0.0</p>
+          <p class="hint">Food log only</p>
+        </article>
+      </section>
+
+      <section class="panel" aria-labelledby="goal-heading">
+        <div class="panel-head">
+          <h2 id="goal-heading">120 lb goal</h2>
+          <p id="goal-percent">0.00%</p>
+        </div>
+        <div
+          id="goal-bar"
+          class="bar"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+          aria-label="Progress toward a 420,000 kcal deficit"
+        >
+          <span id="goal-fill"></span>
+        </div>
+        <dl class="facts">
+          <div>
+            <dt>Estimated lost</dt>
+            <dd id="lbs-est">0.00 lb</dd>
+          </div>
+          <div>
+            <dt>Deficit goal</dt>
+            <dd>420,000 kcal</dd>
+          </div>
+          <div>
+            <dt>Still to go</dt>
+            <dd id="kcal-left">420,000 kcal</dd>
+          </div>
+        </dl>
+        <p class="note">120 lb × 3,500 kcal/lb. The bar fills as the net deficit grows from the fixed start time.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="log-heading">
+        <h2 id="log-heading">Log</h2>
+        <div class="forms">
+          <form id="food-form" class="card-form food">
+            <h3>Food</h3>
+            <label>
+              Name
+              <input name="item" type="text" maxlength="80" autocomplete="off" required placeholder="Oatmeal">
+            </label>
+            <label>
+              Calories
+              <input name="calories" type="text" inputmode="decimal" autocomplete="off" required placeholder="350" enterkeyhint="done">
+            </label>
+            <button type="submit" class="btn btn-food">Add food</button>
+          </form>
+          <form id="workout-form" class="card-form workout">
+            <h3>Workout</h3>
+            <label>
+              Name
+              <input name="item" type="text" maxlength="80" autocomplete="off" required placeholder="Walk">
+            </label>
+            <label>
+              Calories
+              <input name="calories" type="text" inputmode="decimal" autocomplete="off" required placeholder="200" enterkeyhint="done">
+            </label>
+            <button type="submit" class="btn btn-workout">Add workout</button>
+          </form>
+        </div>
+        <p id="form-status" class="status" role="status"></p>
+        <div class="log-actions">
+          <button type="button" id="undo-btn" class="btn btn-ghost">Undo last</button>
+          <button type="button" id="clear-btn" class="btn btn-ghost">Clear food and workout log</button>
+        </div>
+        <div class="table-wrap">
+          <table id="log-table" hidden>
+            <caption class="sr-only">Food and workout entries</caption>
+            <thead>
+              <tr>
+                <th scope="col">Time</th>
+                <th scope="col">Type</th>
+                <th scope="col">Item</th>
+                <th scope="col" class="num">Calories</th>
+              </tr>
+            </thead>
+            <tbody id="log-body"></tbody>
+          </table>
+        </div>
+        <p id="log-empty" class="empty">No food or workouts yet. The baseline burn still counts.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="weight-heading">
+        <h2 id="weight-heading">Weight</h2>
+        <dl class="facts">
+          <div>
+            <dt>Current</dt>
+            <dd id="wt-current">345.0 lb</dd>
+          </div>
+          <div>
+            <dt>Lost</dt>
+            <dd id="wt-lost">0.00 lb</dd>
+          </div>
+          <div>
+            <dt>Remaining</dt>
+            <dd id="wt-left">120.00 lb</dd>
+          </div>
+        </dl>
+        <p class="note">Starting weight 345 lb. Goal line at 225 lb.</p>
+        <form id="weight-form" class="weight-form">
+          <label>
+            Weight (lb)
+            <input name="lb" type="text" inputmode="decimal" autocomplete="off" required placeholder="344.2" enterkeyhint="done">
+          </label>
+          <button type="submit" class="btn btn-primary">Add weight</button>
+        </form>
+        <p id="weight-status" class="status" role="status"></p>
+        <div class="chart-wrap">
+          <svg id="weight-chart" viewBox="0 0 360 220" role="img" aria-labelledby="chart-title chart-desc">
+            <title id="chart-title">Weight chart</title>
+            <desc id="chart-desc">Weight starts at 345 pounds with a goal line at 225.</desc>
+          </svg>
+        </div>
+        <ul class="legend">
+          <li><span class="swatch start" aria-hidden="true"></span> Start 345</li>
+          <li><span class="swatch log" aria-hidden="true"></span> Weigh-ins</li>
+          <li><span class="swatch goal" aria-hidden="true"></span> Goal 225</li>
+        </ul>
+        <ul id="weight-list" class="weight-list"></ul>
+        <p id="weight-empty" class="empty">No weigh-ins yet. Current weight stays at 345 lb until you log one.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="backup-heading">
+        <h2 id="backup-heading">Backup</h2>
+        <p class="note">Food, workouts, and weight stay in this browser. Export a JSON file to keep a copy on this device.</p>
+        <div class="log-actions">
+          <button type="button" id="export-btn" class="btn btn-primary">Export JSON</button>
+          <button type="button" id="import-btn" class="btn btn-ghost">Import JSON</button>
+          <input id="import-file" type="file" accept="application/json,.json" hidden>
+        </div>
+        <p id="backup-status" class="status" role="status"></p>
+      </section>
+    </main>
+
+    <footer>
+      <p>Stored only in localStorage on this device. Nothing is sent to a server.</p>
+    </footer>
+  </div>
+  <script src="app.js"></script>
+  <noscript>
+    <p class="notice">Turn on JavaScript to run the tracker. Totals are calculated on this device.</p>
+  </noscript>
+</body>
+</html>

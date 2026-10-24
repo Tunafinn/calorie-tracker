@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Calorie tracker icon">
+  <rect width="512" height="512" fill="#148046"/>
+  <polygon fill="#F6D15B" points="256,98 318,168 304,214 372,268 328,300 386,372 304,418 256,452 208,418 126,372 184,300 140,268 208,214 194,168"/>
+  <polygon fill="#2F7EDB" points="256,248 292,300 286,348 256,392 226,348 220,300"/>
+  <ellipse cx="286" cy="196" rx="28" ry="42" fill="#FFF6D4"/>
+</svg>
