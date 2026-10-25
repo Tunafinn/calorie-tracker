@@ -278,6 +278,210 @@
     return lb.toFixed(1);
   }
 
+  const CHICAGO = "America/Chicago";
+  const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const WEEKDAY_INDEX = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+  function chicagoParts(ms) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: CHICAGO,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).formatToParts(new Date(ms));
+    const map = {};
+    parts.forEach(function (part) {
+      if (part.type !== "literal") map[part.type] = part.value;
+    });
+    let hour = Number(map.hour);
+    if (hour === 24) hour = 0;
+    return {
+      year: Number(map.year),
+      month: Number(map.month),
+      day: Number(map.day),
+      weekday: map.weekday,
+      hour: hour,
+      minute: Number(map.minute),
+      second: Number(map.second),
+    };
+  }
+
+  function chicagoOffset(utcMs) {
+    const part = chicagoParts(utcMs);
+    const asUtc = Date.UTC(part.year, part.month - 1, part.day, part.hour, part.minute, part.second);
+    return asUtc - utcMs;
+  }
+
+  function chicagoMidnight(year, month, day) {
+    let utc = Date.UTC(year, month - 1, day, 6, 0, 0);
+    for (let i = 0; i < 4; i += 1) {
+      utc = Date.UTC(year, month - 1, day, 0, 0, 0) - chicagoOffset(utc);
+    }
+    return utc;
+  }
+
+  function addCalendarDays(year, month, day, delta) {
+    const shifted = new Date(Date.UTC(year, month - 1, day + delta));
+    return {
+      year: shifted.getUTCFullYear(),
+      month: shifted.getUTCMonth() + 1,
+      day: shifted.getUTCDate(),
+    };
+  }
+
+  function compareYmd(a, b) {
+    if (a.year !== b.year) return a.year - b.year;
+    if (a.month !== b.month) return a.month - b.month;
+    return a.day - b.day;
+  }
+
+  function ymdKey(ymd) {
+    return String(ymd.year) + "-" + String(ymd.month).padStart(2, "0") + "-" + String(ymd.day).padStart(2, "0");
+  }
+
+  function ymdFromMs(ms) {
+    const part = chicagoParts(ms);
+    return { year: part.year, month: part.month, day: part.day, weekday: part.weekday };
+  }
+
+  function burnBetween(startMs, endMs, nowMs) {
+    const from = Math.max(startMs, START_MS);
+    const to = Math.min(endMs, nowMs);
+    if (!(to > from)) return 0;
+    return ((to - from) / MS_PER_DAY) * BURN_PER_DAY;
+  }
+
+  function periodNet(entries, startMs, endMs, nowMs) {
+    let food = 0;
+    let workout = 0;
+    (entries || []).forEach(function (entry) {
+      const at = Date.parse(entry.time);
+      if (!Number.isFinite(at) || at < startMs || at >= endMs) return;
+      if (entry.type === "food") food += entry.calories;
+      else if (entry.type === "workout") workout += entry.calories;
+    });
+    const base = burnBetween(startMs, endMs, nowMs);
+    const net = base + workout - food;
+    return {
+      startMs: startMs,
+      endMs: endMs,
+      base: base,
+      food: food,
+      workout: workout,
+      net: net,
+      lbs: net / KCAL_PER_LB,
+      kind: net >= 0 ? "deficit" : "surplus",
+    };
+  }
+
+  function withBars(rows) {
+    let max = 0;
+    rows.forEach(function (row) { max = Math.max(max, Math.abs(row.net)); });
+    return rows.map(function (row) {
+      const pct = max > 0 ? (Math.abs(row.net) / max) * 100 : 0;
+      return Object.assign({}, row, { barPct: pct > 0 ? Math.max(pct, 3) : 0 });
+    });
+  }
+
+  function buildPeriods(entries, nowMs) {
+    const today = ymdFromMs(nowMs);
+    const yesterday = addCalendarDays(today.year, today.month, today.day, -1);
+    const todayStart = chicagoMidnight(today.year, today.month, today.day);
+    const tomorrow = addCalendarDays(today.year, today.month, today.day, 1);
+    const todayEnd = chicagoMidnight(tomorrow.year, tomorrow.month, tomorrow.day);
+    const yesterdayStart = chicagoMidnight(yesterday.year, yesterday.month, yesterday.day);
+    const weekIndex = WEEKDAY_INDEX[today.weekday] || 0;
+    const weekStartYmd = addCalendarDays(today.year, today.month, today.day, -weekIndex);
+    const weekStart = chicagoMidnight(weekStartYmd.year, weekStartYmd.month, weekStartYmd.day);
+    const weekEndYmd = addCalendarDays(weekStartYmd.year, weekStartYmd.month, weekStartYmd.day, 7);
+    const weekEnd = chicagoMidnight(weekEndYmd.year, weekEndYmd.month, weekEndYmd.day);
+    const monthStart = chicagoMidnight(today.year, today.month, 1);
+    const nextMonth = today.month === 12
+      ? { year: today.year + 1, month: 1, day: 1 }
+      : { year: today.year, month: today.month + 1, day: 1 };
+    const monthEnd = chicagoMidnight(nextMonth.year, nextMonth.month, 1);
+
+    const startDay = ymdFromMs(START_MS);
+    let first = startDay;
+    let last = today;
+    (entries || []).forEach(function (entry) {
+      const at = Date.parse(entry.time);
+      if (!Number.isFinite(at)) return;
+      const ymd = ymdFromMs(at);
+      if (compareYmd(ymd, first) < 0) first = ymd;
+      if (compareYmd(ymd, last) > 0) last = ymd;
+    });
+    if (compareYmd(today, first) < 0) first = today;
+    if (compareYmd(today, last) > 0) last = today;
+
+    const days = [];
+    let cursor = { year: first.year, month: first.month, day: first.day };
+    while (compareYmd(cursor, last) <= 0 && days.length < 4000) {
+      const start = chicagoMidnight(cursor.year, cursor.month, cursor.day);
+      const next = addCalendarDays(cursor.year, cursor.month, cursor.day, 1);
+      const end = chicagoMidnight(next.year, next.month, next.day);
+      const stats = periodNet(entries, start, end, nowMs);
+      const part = chicagoParts(start);
+      days.push(Object.assign({
+        key: ymdKey(cursor),
+        label: part.weekday + ", " + MONTH_NAMES[cursor.month - 1] + " " + cursor.day,
+        monthKey: String(cursor.year) + "-" + String(cursor.month).padStart(2, "0"),
+        monthLabel: MONTH_NAMES[cursor.month - 1] + " " + cursor.year,
+      }, stats));
+      cursor = next;
+    }
+
+    const months = [];
+    days.forEach(function (day) {
+      let bucket = null;
+      for (let i = 0; i < months.length; i += 1) {
+        if (months[i].key === day.monthKey) bucket = months[i];
+      }
+      if (!bucket) {
+        bucket = {
+          key: day.monthKey,
+          label: day.monthLabel,
+          base: 0,
+          food: 0,
+          workout: 0,
+          net: 0,
+        };
+        months.push(bucket);
+      }
+      bucket.base += day.base;
+      bucket.food += day.food;
+      bucket.workout += day.workout;
+      bucket.net += day.net;
+    });
+    months.forEach(function (bucket) {
+      bucket.lbs = bucket.net / KCAL_PER_LB;
+      bucket.kind = bucket.net >= 0 ? "deficit" : "surplus";
+    });
+
+    return {
+      today: Object.assign({ label: "Today", range: "Since midnight" }, periodNet(entries, todayStart, todayEnd, nowMs)),
+      yesterday: Object.assign({
+        label: "Yesterday",
+        range: MONTH_NAMES[yesterday.month - 1] + " " + yesterday.day,
+      }, periodNet(entries, yesterdayStart, todayStart, nowMs)),
+      week: Object.assign({
+        label: "This week",
+        range: MONTH_NAMES[weekStartYmd.month - 1] + " " + weekStartYmd.day + " – now",
+      }, periodNet(entries, weekStart, weekEnd, nowMs)),
+      month: Object.assign({
+        label: "This month",
+        range: MONTH_NAMES[today.month - 1] + " 1 – now",
+      }, periodNet(entries, monthStart, monthEnd, nowMs)),
+      days: withBars(days.slice().reverse()),
+      months: withBars(months.slice().reverse()),
+    };
+  }
+
   const api = {
     START_ISO: START_ISO,
     START_MS: START_MS,
@@ -295,6 +499,11 @@
     clearLog: clearLog,
     layoutChart: layoutChart,
     parsePositive: parsePositive,
+    chicagoMidnight: chicagoMidnight,
+    burnBetween: burnBetween,
+    periodNet: periodNet,
+    buildPeriods: buildPeriods,
+    PRESERVED_KEYS: ["coop-cal-total-v2", "coop-weight-v1"],
   };
 
   if (typeof module !== "undefined" && module.exports) {
@@ -368,6 +577,71 @@
   const chartDesc = document.getElementById("chart-desc");
 
   let state = { entries: [], weights: [] };
+  let externalEntries = [];
+  let externalWeights = [];
+  let periodSignature = "";
+
+  function installStorageGuard() {
+    try {
+      const allowed = {};
+      allowed[STORAGE_KEY] = true;
+      allowed[THEME_KEY] = true;
+      const proto = Object.getPrototypeOf(localStorage);
+      const origSet = proto.setItem;
+      const origRemove = proto.removeItem;
+      localStorage.setItem = function (key, value) {
+        if (!allowed[key]) return;
+        return origSet.call(this, key, value);
+      };
+      localStorage.removeItem = function (key) {
+        if (!allowed[key]) return;
+        return origRemove.call(this, key);
+      };
+      localStorage.clear = function () {};
+    } catch (e) {}
+  }
+
+  function rowsFrom(raw, cleaner, listKeys) {
+    if (!raw) return [];
+    let data;
+    try { data = JSON.parse(raw); } catch (e) { return []; }
+    let rows = [];
+    if (Array.isArray(data)) rows = data;
+    else if (data && typeof data === "object") {
+      listKeys.forEach(function (key) {
+        if (Array.isArray(data[key])) rows = rows.concat(data[key]);
+      });
+    }
+    return rows.map(cleaner).filter(Boolean);
+  }
+
+  function readPreserved() {
+    externalEntries = [];
+    externalWeights = [];
+    try {
+      externalEntries = rowsFrom(localStorage.getItem("coop-cal-total-v2"), cleanEntry, ["entries", "items", "logs"]);
+      externalWeights = rowsFrom(localStorage.getItem("coop-weight-v1"), cleanWeight, ["weights", "entries"]);
+    } catch (e) {}
+  }
+
+  function mergeRows(primary, extra) {
+    const seen = new Set();
+    const out = [];
+    primary.concat(extra).forEach(function (item) {
+      const key = [item.id, item.time, item.type || "", item.calories != null ? item.calories : item.lb, item.name || ""].join("|");
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(item);
+    });
+    return out;
+  }
+
+  function viewState() {
+    return {
+      entries: mergeRows(state.entries, externalEntries),
+      weights: mergeRows(state.weights, externalWeights),
+    };
+  }
 
   function formatKcal(value, digits) {
     return value.toLocaleString("en-US", {
@@ -450,7 +724,7 @@
   }
 
   function renderTotals(nowMs) {
-    const summary = summarize(state, nowMs);
+    const summary = summarize(viewState(), nowMs);
     netValue.textContent = formatKcal(summary.net, 2);
     burnedValue.textContent = formatKcal(summary.burned, 2);
     eatenValue.textContent = formatKcal(summary.eaten, 1);
@@ -525,7 +799,7 @@
   }
 
   function renderChart(summary, nowMs) {
-    const layout = layoutChart(state.weights, nowMs);
+    const layout = layoutChart(viewState().weights, nowMs);
     chartDesc.textContent = "Weight starts at 345 pounds. The goal line is 225 pounds. Current weight is " +
       summary.currentWeight.toFixed(1) + " pounds.";
     const existing = weightChart.querySelector("#chart-shapes");
@@ -635,9 +909,90 @@
     weightEmpty.hidden = rows.length > 0;
   }
 
+  function paintPeriod(root, stats) {
+    root.classList.toggle("is-deficit", stats.kind === "deficit");
+    root.classList.toggle("is-surplus", stats.kind === "surplus");
+    const kcal = root.querySelector(".period-kcal");
+    const kind = root.querySelector(".period-kind");
+    const lbs = root.querySelector(".period-lbs");
+    const range = root.querySelector(".period-range");
+    const split = root.querySelector(".period-split");
+    const bar = root.querySelector(".period-bar > span");
+    if (kcal) kcal.textContent = formatKcal(Math.abs(stats.net), 1) + " kcal";
+    if (kind) kind.textContent = stats.kind;
+    if (lbs) lbs.textContent = formatLb(Math.abs(stats.lbs), 2);
+    if (range && stats.range) range.textContent = stats.range;
+    if (split) {
+      split.textContent = "Burn " + formatKcal(stats.base + stats.workout, 1) + " · food " + formatKcal(stats.food, 1);
+    }
+    if (bar) bar.style.width = (stats.barPct || 0) + "%";
+  }
+
+  function periodRow(stats) {
+    const row = document.createElement("div");
+    row.className = "period-row";
+    row.dataset.key = stats.key;
+    const top = document.createElement("div");
+    top.className = "period-row-top";
+    const date = document.createElement("span");
+    date.className = "period-row-date";
+    date.textContent = stats.label;
+    const kind = document.createElement("span");
+    kind.className = "period-kind";
+    top.append(date, kind);
+    const kcal = document.createElement("p");
+    kcal.className = "period-kcal";
+    const lbs = document.createElement("p");
+    lbs.className = "period-lbs";
+    const split = document.createElement("p");
+    split.className = "period-split";
+    const bar = document.createElement("div");
+    bar.className = "period-bar";
+    bar.setAttribute("aria-hidden", "true");
+    bar.appendChild(document.createElement("span"));
+    row.append(top, kcal, lbs, split, bar);
+    paintPeriod(row, stats);
+    return row;
+  }
+
+  function fillHistory(container, rows) {
+    const scroll = container.scrollTop;
+    container.textContent = "";
+    rows.forEach(function (stats) { container.appendChild(periodRow(stats)); });
+    container.scrollTop = scroll;
+  }
+
+  function updateHistory(container, rows) {
+    rows.forEach(function (stats) {
+      const row = container.querySelector('[data-key="' + stats.key + '"]');
+      if (row) paintPeriod(row, stats);
+    });
+  }
+
+  function renderPeriods(nowMs) {
+    const report = buildPeriods(viewState().entries, nowMs);
+    paintPeriod(document.getElementById("period-today"), report.today);
+    paintPeriod(document.getElementById("period-yesterday"), report.yesterday);
+    paintPeriod(document.getElementById("period-week"), report.week);
+    paintPeriod(document.getElementById("period-month"), report.month);
+    const dayHistory = document.getElementById("day-history");
+    const monthHistory = document.getElementById("month-history");
+    const signature = report.days.map(function (day) { return day.key; }).join(",") + "|" +
+      report.months.map(function (month) { return month.key; }).join(",");
+    if (signature !== periodSignature) {
+      periodSignature = signature;
+      fillHistory(dayHistory, report.days);
+      fillHistory(monthHistory, report.months);
+    } else {
+      updateHistory(dayHistory, report.days);
+      updateHistory(monthHistory, report.months);
+    }
+  }
+
   function renderAll() {
     const now = Date.now();
     const summary = renderTotals(now);
+    renderPeriods(now);
     renderLog();
     renderWeights(summary, now);
   }
@@ -856,14 +1211,27 @@
   try { storedTheme = localStorage.getItem(THEME_KEY); } catch (e) {}
   applyTheme(storedTheme === "light" || storedTheme === "dark" ? storedTheme : null);
 
+  installStorageGuard();
   const loaded = loadState();
   state = { entries: loaded.entries, weights: loaded.weights };
+  readPreserved();
   if (loaded.warning) showNotice(loaded.warning);
   if (loaded.skipped > 0) save();
   renderAll();
-  window.setInterval(function () { renderTotals(Date.now()); }, 1000);
+  window.setInterval(function () {
+    const now = Date.now();
+    renderTotals(now);
+    renderPeriods(now);
+  }, 1000);
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch(function () {});
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (!hadController) return;
+      window.location.reload();
+    });
+    navigator.serviceWorker.register("./sw.js").then(function (registration) {
+      if (registration.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    }).catch(function () {});
   }
 })();

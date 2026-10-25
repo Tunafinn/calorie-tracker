@@ -96,6 +96,45 @@
         <p class="note">120 lb × 3,500 kcal/lb. The bar fills as the net deficit grows from the fixed start time.</p>
       </section>
 
+      <section class="panel" id="periods" data-build="periods-1" aria-labelledby="periods-heading">
+        <h2 id="periods-heading">By period</h2>
+        <p class="note">Net is burn since 1:00 AM CT on Oct 24, 2026, plus workouts logged in the period, minus food logged then. Days start at Chicago midnight. The week starts Sunday.</p>
+        <div class="period-grid">
+          <article class="period-card" id="period-today">
+            <h3>Today</h3>
+            <p class="period-range"></p>
+            <p class="period-kcal">0.0 kcal</p>
+            <p class="period-kind">deficit</p>
+            <p class="period-lbs">0.00 lb</p>
+          </article>
+          <article class="period-card" id="period-yesterday">
+            <h3>Yesterday</h3>
+            <p class="period-range"></p>
+            <p class="period-kcal">0.0 kcal</p>
+            <p class="period-kind">deficit</p>
+            <p class="period-lbs">0.00 lb</p>
+          </article>
+          <article class="period-card" id="period-week">
+            <h3>This week</h3>
+            <p class="period-range"></p>
+            <p class="period-kcal">0.0 kcal</p>
+            <p class="period-kind">deficit</p>
+            <p class="period-lbs">0.00 lb</p>
+          </article>
+          <article class="period-card" id="period-month">
+            <h3>This month</h3>
+            <p class="period-range"></p>
+            <p class="period-kcal">0.0 kcal</p>
+            <p class="period-kind">deficit</p>
+            <p class="period-lbs">0.00 lb</p>
+          </article>
+        </div>
+        <h3 class="subhead">Each day</h3>
+        <div class="period-scroll" id="day-history" tabindex="0" aria-label="Net calories by day"></div>
+        <h3 class="subhead">Each month</h3>
+        <div class="period-scroll period-scroll-short" id="month-history" tabindex="0" aria-label="Net calories by month"></div>
+      </section>
+
       <section class="panel" aria-labelledby="log-heading">
         <h2 id="log-heading">Log</h2>
         <div class="forms">

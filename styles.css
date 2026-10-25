@@ -12,6 +12,8 @@
   --yellow: #e6b000;
   --yellow-ink: #6d5600;
   --yellow-soft: #fff6d6;
+  --surplus: #c2410c;
+  --surplus-ink: #9a3412;
   --on-green: #ffffff;
   --on-blue: #ffffff;
   --on-yellow: #1c1600;
@@ -38,6 +40,8 @@
     --yellow: #f5d056;
     --yellow-ink: #ffe9a0;
     --yellow-soft: #332b12;
+    --surplus: #f5a524;
+    --surplus-ink: #ffd089;
     --on-green: #04210f;
     --on-blue: #041425;
     --on-yellow: #241c00;
@@ -63,6 +67,8 @@
   --yellow: #f5d056;
   --yellow-ink: #ffe9a0;
   --yellow-soft: #332b12;
+  --surplus: #f5a524;
+  --surplus-ink: #ffd089;
   --on-green: #04210f;
   --on-blue: #041425;
   --on-yellow: #241c00;
@@ -287,6 +293,105 @@ h1 {
 .stat.eaten > p:first-of-type { color: var(--yellow-ink); }
 
 .panel { padding: 1rem 0.95rem; }
+
+.subhead {
+  margin: 1rem 0 0;
+  font-size: 0.98rem;
+}
+
+.period-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.period-card,
+.period-row {
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.65rem 0.65rem 0.7rem;
+}
+
+.period-card { border-top: 4px solid var(--line); }
+.period-card h3,
+.period-row-date {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.period-range,
+.period-kind,
+.period-lbs,
+.period-split {
+  margin: 0.12rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.period-kcal {
+  margin: 0.28rem 0 0;
+  font-size: clamp(0.95rem, 3.6vw, 1.2rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  overflow-wrap: normal;
+}
+
+.period-card.is-deficit { border-top-color: var(--green); }
+.period-card.is-surplus { border-top-color: var(--surplus); }
+.period-card.is-deficit .period-kcal,
+.period-card.is-deficit .period-kind,
+.period-row.is-deficit .period-kcal,
+.period-row.is-deficit .period-kind { color: var(--green-ink); }
+.period-card.is-surplus .period-kcal,
+.period-card.is-surplus .period-kind,
+.period-row.is-surplus .period-kcal,
+.period-row.is-surplus .period-kind { color: var(--surplus-ink); }
+
+.period-scroll {
+  max-height: 18rem;
+  overflow: auto;
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+  padding-right: 0.1rem;
+}
+
+.period-scroll-short { max-height: 12rem; }
+
+.period-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.period-bar {
+  height: 10px;
+  margin-top: 0.4rem;
+  background: var(--yellow-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.period-bar > span {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--green);
+}
+
+.period-row.is-surplus .period-bar > span { background: var(--surplus); }
 
 .panel h2 { margin: 0; font-size: 1.15rem; }
 
